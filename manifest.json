@@ -1,0 +1,26 @@
+{
+  "name": "Dijital Karargâh",
+  "short_name": "Karargâh",
+  "description": "Komuta Merkeziniz — Görev ve Ajanda Yönetimi",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#121212",
+  "theme_color": "#121212",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "https://via.placeholder.com/192x192/FFB300/121212?text=DK",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://via.placeholder.com/512x512/FFB300/121212?text=DK",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "utilities"],
+  "lang": "tr"
+}
