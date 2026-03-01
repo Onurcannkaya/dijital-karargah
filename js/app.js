@@ -1,6 +1,6 @@
 /**
- * app.js — Dijital Karargâh v1.0 (Production)
- * Auth + Calendar + Realtime + Notifications + Confetti + Senior Polish
+ * app.js — Dijital Karargâh v2.0 (Final Strike)
+ * Auth + Calendar + Realtime + Notifications + Confetti + RSVP + Search + Motivasyon
  */
 
 import { db, CATEGORIES } from './db.js';
@@ -17,9 +17,36 @@ const State = {
   calendarYear: new Date().getFullYear(),
   calendarMonth: new Date().getMonth(),
   selectedPriority: 'medium',
-  notifiedTaskIds: new Set(),      // Bildirim gönderilmiş görev ID'leri
-  reminderInterval: null
+  notifiedTaskIds: new Set(),
+  reminderInterval: null,
+  searchQuery: ''
 };
+
+// ─────────────────────────────────────────────
+// MOTIVASYON SÖZLERİ
+// ─────────────────────────────────────────────
+const MOTIVATIONAL_QUOTES = [
+  { text: "Başarı, her gün tekrarlanan küçük çabaların toplamıdır.", author: "Robert Collier" },
+  { text: "Gelecek, bugün ne yaptığına bağlıdır.", author: "Mahatma Gandhi" },
+  { text: "Disiplin, motivasyon tükendiğinde devam etmektir.", author: "Jim Rohn" },
+  { text: "Her uzman bir zamanlar amatördü.", author: "Helen Hayes" },
+  { text: "Yarını değiştirmenin tek yolu bugün bir şey yapmaktır.", author: "Simone de Beauvoir" },
+  { text: "Düşmekten korkma, kalkmamaktan kork.", author: "Anonim" },
+  { text: "Bir planın olması, başarının yarısıdır.", author: "Zig Ziglar" },
+  { text: "Büyük işler, küçük adımlardan oluşur.", author: "Lao Tzu" },
+  { text: "Bugünü yakala, yarına mümkün olduğunca az güven.", author: "Horatius" },
+  { text: "Fırtınadan sonra güneş daha güzel doğar.", author: "Türk Atasözü" },
+  { text: "En karanlık gecenin bile bir sonu vardır.", author: "Victor Hugo" },
+  { text: "Tek sınır, kendi zihninde çizdiğin çizgidir.", author: "Anonim" },
+  { text: "İlham beklemek yerine, işe başla; ilham seni bulacaktır.", author: "Pablo Picasso" },
+  { text: "Hayat cesaret gösterenlerin yanındadır.", author: "Seneca" },
+  { text: "Hedefsiz bir gemi, hiçbir rüzgâr ona yardım edemez.", author: "Seneca" },
+  { text: "Zaferin %90'ı orada bulunmaktır.", author: "Woody Allen" },
+  { text: "Zorluklardan cesaret, kararsızlıktan kararlılık doğar.", author: "Anonim" },
+  { text: "Yapman gereken tek şey, bugün dünden biraz daha iyi olmak.", author: "Anonim" },
+  { text: "Bir adım at. Yol yürüdükçe açılır.", author: "Hz. Mevlâna" },
+  { text: "Şimdi başla. Mükemmel an diye bir şey yoktur.", author: "Napoleon Hill" }
+];
 
 // ─────────────────────────────────────────────
 // DOM
@@ -72,6 +99,9 @@ function cacheDom() {
   DOM.calDays = document.getElementById('cal-days');
   DOM.calPrev = document.getElementById('cal-prev');
   DOM.calNext = document.getElementById('cal-next');
+  DOM.motivationText = document.getElementById('motivation-text');
+  DOM.searchInput = document.getElementById('search-input');
+  DOM.searchClear = document.getElementById('search-clear');
 }
 
 // ─────────────────────────────────────────────
@@ -106,6 +136,39 @@ function escapeHtml(str) {
 }
 
 // ─────────────────────────────────────────────
+// 💡 MOTIVASYON WIDGET
+// ─────────────────────────────────────────────
+function renderMotivation() {
+  if (!DOM.motivationText) return;
+  const today = new Date();
+  const dayIndex = (today.getFullYear() * 366 + today.getMonth() * 31 + today.getDate()) % MOTIVATIONAL_QUOTES.length;
+  const quote = MOTIVATIONAL_QUOTES[dayIndex];
+  DOM.motivationText.innerHTML = `"${escapeHtml(quote.text)}" <span class="motivation-widget__author">— ${escapeHtml(quote.author)}</span>`;
+}
+
+// ─────────────────────────────────────────────
+// 🔍 ARAMA ÇUBUĞU
+// ─────────────────────────────────────────────
+let searchDebounce = null;
+function initSearch() {
+  if (!DOM.searchInput) return;
+  DOM.searchInput.addEventListener('input', () => {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(() => {
+      State.searchQuery = DOM.searchInput.value.trim().toLowerCase();
+      DOM.searchClear.style.display = State.searchQuery ? '' : 'none';
+      renderTasks();
+    }, 250);
+  });
+  DOM.searchClear?.addEventListener('click', () => {
+    DOM.searchInput.value = '';
+    State.searchQuery = '';
+    DOM.searchClear.style.display = 'none';
+    renderTasks();
+  });
+}
+
+// ─────────────────────────────────────────────
 // 🎉 TOAST (Enhanced)
 // ─────────────────────────────────────────────
 function showToast(message, type = 'success') {
@@ -126,7 +189,7 @@ function showToast(message, type = 'success') {
 }
 
 // ─────────────────────────────────────────────
-// 🎊 CONFETTI (Mini celebration on task complete)
+// 🎊 CONFETTI
 // ─────────────────────────────────────────────
 function spawnConfetti(targetEl) {
   const rect = targetEl.getBoundingClientRect();
@@ -157,33 +220,23 @@ async function requestNotificationPermission() {
   }
 }
 
-function sendNotification(title, body, icon = '⚔️') {
+function sendNotification(title, body) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
   try {
     new Notification(title, { body, icon: '/icons/icon-192x192.png', badge: '/icons/icon-72x72.png', tag: body });
-  } catch { /* SW tabanlı bildirim fallback */ }
+  } catch { /* SW fallback */ }
 }
 
 // ─────────────────────────────────────────────
-// ⏰ REMINDER ENGINE (Her 60 saniyede kontrol)
+// ⏰ REMINDER ENGINE
 // ─────────────────────────────────────────────
 function startReminderEngine() {
   if (State.reminderInterval) clearInterval(State.reminderInterval);
-
   State.reminderInterval = setInterval(() => {
-    const now = new Date();
-    const nowStr = now.toISOString().slice(0, 16); // "YYYY-MM-DDTHH:MM"
-
+    const nowStr = new Date().toISOString().slice(0, 16);
     State.tasks.forEach(task => {
-      if (task.completed) return;
-      if (State.notifiedTaskIds.has(task.id)) return;
-      if (!task.dueDate) return;
-
-      // datetime-local veya sadece tarih karşılaştır
-      const taskDate = task.dueDate.length > 10
-        ? task.dueDate.slice(0, 16)     // datetime-local
-        : task.dueDate + 'T09:00';      // sadece tarih → sabah 9
-
+      if (task.completed || State.notifiedTaskIds.has(task.id) || !task.dueDate) return;
+      const taskDate = task.dueDate.length > 10 ? task.dueDate.slice(0, 16) : task.dueDate + 'T09:00';
       if (taskDate <= nowStr) {
         State.notifiedTaskIds.add(task.id);
         sendNotification('⏳ Vakit Geldi!', task.title);
@@ -194,10 +247,7 @@ function startReminderEngine() {
 }
 
 function stopReminderEngine() {
-  if (State.reminderInterval) {
-    clearInterval(State.reminderInterval);
-    State.reminderInterval = null;
-  }
+  if (State.reminderInterval) { clearInterval(State.reminderInterval); State.reminderInterval = null; }
 }
 
 // ─────────────────────────────────────────────
@@ -205,19 +255,12 @@ function stopReminderEngine() {
 // ─────────────────────────────────────────────
 function startRealtime() {
   db.subscribeToTasks((newTask) => {
-    // Eğer bu görev zaten listede varsa atla
     if (State.tasks.some(t => t.id === newTask.id)) return;
-
-    // Kendi görevimiz mi?
     const isMine = State.user && newTask.userId === State.user.id;
-
-    // Shared ve başkası eklemiş → bildirim gönder
     if (newTask.visibility === 'shared' && !isMine) {
-      sendNotification('📣 Yeni Ortak Operasyon', newTask.title);
-      showToast(`📣 Ortak Görev: ${newTask.title}`, 'info');
+      sendNotification('📣 Yeni Ortak Plan', `${newTask.title} — Sen de katılıyor musun?`);
+      showToast(`📣 Yeni Plan: ${newTask.title}`, 'info');
     }
-
-    // State'e ekle ve DOM'u güncelle (sayfa yenilemeden!)
     State.tasks.unshift(newTask);
     renderTasks();
     renderStats();
@@ -321,7 +364,7 @@ function renderHeader() {
 }
 
 // ─────────────────────────────────────────────
-// TASK CARD (Senior UI with badges)
+// TASK CARD (RSVP + Shared Badges)
 // ─────────────────────────────────────────────
 function createTaskCard(task) {
   const cat = getCategoryById(task.categoryId);
@@ -333,15 +376,27 @@ function createTaskCard(task) {
   card.setAttribute('role', 'listitem');
 
   const priorityMap = { high: '🔴', medium: '🟡', low: '🟢' };
-
-  // Shared badge + assignee
   const isShared = task.visibility === 'shared';
-  const sharedBadge = isShared
-    ? `<span class="shared-badge">🌐 Ekip</span>`
-    : '';
+  const sharedBadge = isShared ? `<span class="shared-badge">🌐 Ekip</span>` : '';
   const assigneeLabel = task.assignedTo
-    ? `<span class="assignee-label">👤 ${escapeHtml(task.assignedTo)}</span>`
-    : '';
+    ? `<span class="assignee-label">👤 ${escapeHtml(task.assignedTo)}</span>` : '';
+
+  // RSVP section for shared tasks
+  const attendeeCount = Array.isArray(task.attendees) ? task.attendees.length : 0;
+  const userJoined = State.user && Array.isArray(task.attendees) && task.attendees.includes(State.user.email);
+  const rsvpHtml = isShared ? `
+    <div class="rsvp-section">
+      <div class="rsvp-buttons">
+        <button class="rsvp-btn rsvp-btn--join ${userJoined ? 'rsvp-btn--active' : ''}" data-action="join" title="Katılıyorum">
+          👍 Katılıyorum
+        </button>
+        <button class="rsvp-btn rsvp-btn--decline ${!userJoined && attendeeCount > 0 ? '' : ''}" data-action="decline" title="Katılamam">
+          👎 Katılamam
+        </button>
+      </div>
+      ${attendeeCount > 0 ? `<span class="rsvp-count">👥 ${attendeeCount} Kişi Katılıyor</span>` : ''}
+    </div>
+  ` : '';
 
   card.innerHTML = `
     <div class="task-card__header">
@@ -369,11 +424,34 @@ function createTaskCard(task) {
       </div>
       <span class="task-priority">${priorityMap[task.priority] || '🟡'}</span>
     </div>
+    ${rsvpHtml}
   `;
 
   card.querySelector('.task-check').addEventListener('click', () => handleToggle(task.id));
   card.querySelector('.btn-delete').addEventListener('click', () => handleDelete(task.id));
+
+  // RSVP event listeners
+  if (isShared) {
+    card.querySelector('.rsvp-btn--join')?.addEventListener('click', () => handleRSVP(task.id, true));
+    card.querySelector('.rsvp-btn--decline')?.addEventListener('click', () => handleRSVP(task.id, false));
+  }
+
   return card;
+}
+
+// ─────────────────────────────────────────────
+// RSVP HANDLER
+// ─────────────────────────────────────────────
+async function handleRSVP(taskId, isJoining) {
+  if (!State.user) { showToast('RSVP için giriş yapmalısınız', 'error'); return; }
+  try {
+    await db.rsvpTask(taskId, State.user.email, isJoining);
+    State.tasks = await db.getTasks();
+    await renderTasks();
+    showToast(isJoining ? 'Katılımınız kaydedildi 👍' : 'Katılım geri çekildi', isJoining ? 'success' : 'info');
+  } catch (err) {
+    showToast(`RSVP hatası: ${err.message}`, 'error');
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -382,7 +460,16 @@ function createTaskCard(task) {
 async function renderTasks() {
   DOM.taskGrid.innerHTML = '';
   let tasks = State.tasks;
+
+  // Kategori filtresi
   if (State.activeFilter !== 'all') tasks = tasks.filter(t => t.categoryId === State.activeFilter);
+
+  // Arama filtresi
+  if (State.searchQuery) {
+    tasks = tasks.filter(t => t.title.toLowerCase().includes(State.searchQuery));
+  }
+
+  // Sıralama
   tasks = [...tasks].sort((a, b) => {
     if (a.completed !== b.completed) return a.completed ? 1 : -1;
     const pOrder = { high: 0, medium: 1, low: 2 };
@@ -408,8 +495,6 @@ async function renderStats() {
   animateNumber(DOM.statsTotal, stats.total);
   animateNumber(DOM.statsDone, stats.completed);
   animateNumber(DOM.statsPending, stats.pending);
-
-  // Progress bar
   if (DOM.progressFill && DOM.progressText) {
     const pct = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
     DOM.progressFill.style.width = `${pct}%`;
@@ -417,7 +502,6 @@ async function renderStats() {
   }
 }
 
-// 🔢 Sayı animasyonu
 function animateNumber(el, target) {
   if (!el) return;
   const current = parseInt(el.textContent, 10) || 0;
@@ -523,13 +607,10 @@ async function handleToggle(id) {
   try {
     const updated = await db.toggleTask(id);
     State.tasks = await db.getTasks();
-
-    // 🎊 Confetti on complete
     if (updated.completed) {
       const cardEl = document.querySelector(`[data-id="${id}"]`);
       if (cardEl) spawnConfetti(cardEl);
     }
-
     await renderTasks();
     if (State.activeView === 'calendar') renderCalendar();
     showToast(updated.completed ? 'Görev tamamlandı! 🎯' : 'Görev geri alındı');
@@ -655,14 +736,17 @@ function initFilters() {
   });
 }
 
-// ─── KEYBOARD SHORTCUTS ──────────────────────
 function initKeyboardShortcuts() {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeModal();
-    // Ctrl+N → Yeni görev (modal açıkken skip)
     if ((e.ctrlKey || e.metaKey) && e.key === 'n' && !DOM.modal.classList.contains('modal--open')) {
       e.preventDefault();
       openModal();
+    }
+    // Ctrl+K → Arama çubuğuna odaklan
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault();
+      DOM.searchInput?.focus();
     }
   });
 }
@@ -699,6 +783,7 @@ async function loadDashboard() {
     State.tasks = [];
   }
   renderHeader();
+  renderMotivation();
   await renderTasks();
   if (State.activeView === 'calendar') renderCalendar();
 }
@@ -712,7 +797,6 @@ async function init() {
 
   // FAB
   if (DOM.fab) {
-    DOM.fab.style.zIndex = '500';
     DOM.fab.addEventListener('click', (e) => {
       e.preventDefault(); e.stopPropagation();
       openModal();
@@ -729,8 +813,9 @@ async function init() {
   initPriorityButtons();
   initVisibilityToggle();
   initKeyboardShortcuts();
+  initSearch();
 
-  // Auth check
+  // 🔐 Auth Persistence — session varsa LOGIN GÖSTERME, doğrudan dashboard aç
   const session = await db.getSession();
   if (session?.user) {
     State.user = session.user;

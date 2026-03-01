@@ -1,6 +1,6 @@
 /**
- * db.js — Dijital Karargâh Veri Katmanı v1.0 (Production)
- * Supabase PostgreSQL + Auth + Realtime entegrasyonu.
+ * db.js — Dijital Karargâh Veri Katmanı v2.0 (Final Strike)
+ * Supabase PostgreSQL + Auth + Realtime + RSVP entegrasyonu.
  */
 
 // ─────────────────────────────────────────────
@@ -36,7 +36,8 @@ function toCamelCase(row) {
     updatedAt: row.updated_at || null,
     userId: row.user_id || null,
     visibility: row.visibility || 'private',
-    assignedTo: row.assigned_to || null
+    assignedTo: row.assigned_to || null,
+    attendees: row.attendees || []
   };
 }
 
@@ -49,6 +50,7 @@ function toSnakeCase(data) {
   if (data.completed !== undefined) mapped.completed = data.completed;
   if (data.visibility !== undefined) mapped.visibility = data.visibility;
   if (data.assignedTo !== undefined) mapped.assigned_to = data.assignedTo;
+  if (data.attendees !== undefined) mapped.attendees = data.attendees;
   return mapped;
 }
 
@@ -221,7 +223,8 @@ class Database {
         completed: false,
         user_id: user.id,
         visibility: taskData.visibility || 'private',
-        assigned_to: taskData.assignedTo || null
+        assigned_to: taskData.assignedTo || null,
+        attendees: []
       };
 
       const { data, error } = await this._client.from('tasks').insert([row]).select();
@@ -273,6 +276,32 @@ class Database {
       return toCamelCase(data[0]);
     } catch (err) {
       console.error('[DB] updateTask hatası:', err.message);
+      throw err;
+    }
+  }
+
+  /**
+   * RSVP — Katılım durumunu güncelle
+   * @param {string} id — görev UUID
+   * @param {string} email — kullanıcı e-postası
+   * @param {boolean} isJoining — katılıyor mu?
+   */
+  async rsvpTask(id, email, isJoining) {
+    try {
+      const task = await this.getTaskById(id);
+      if (!task) throw new Error('Görev bulunamadı');
+      let attendees = Array.isArray(task.attendees) ? [...task.attendees] : [];
+      if (isJoining) {
+        if (!attendees.includes(email)) attendees.push(email);
+      } else {
+        attendees = attendees.filter(e => e !== email);
+      }
+      const { data, error } = await this._client
+        .from('tasks').update({ attendees }).eq('id', id).select();
+      if (error) throw error;
+      return toCamelCase(data[0]);
+    } catch (err) {
+      console.error('[DB] rsvpTask hatası:', err.message);
       throw err;
     }
   }

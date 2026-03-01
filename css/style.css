@@ -1,5 +1,5 @@
 /* ============================================================
-   Dijital Karargâh — Dark Industrial Elegance v1.0 (Production)
+   Dijital Karargâh — Dark Industrial Elegance v2.0 (Final Strike)
    CSS Custom Properties + BEM Metodolojisi
    ============================================================ */
 
@@ -54,6 +54,8 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* Hafif grid doku */
@@ -1370,10 +1372,11 @@ body.body--modal-open {
   }
 
   .fab {
-    bottom: 24px;
+    bottom: 20px;
     right: 20px;
     width: 54px;
     height: 54px;
+    z-index: 9999;
   }
 
   .category-grid {
@@ -2099,4 +2102,275 @@ body,
 
 :root.light-theme .cal-nav-btn {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+/* ─── 💡 MOTİVASYON WİDGET ───────────────────────── */
+.motivation-widget {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  background: linear-gradient(135deg, rgba(255, 179, 0, 0.08) 0%, rgba(255, 179, 0, 0.03) 100%);
+  border: 1px solid rgba(255, 179, 0, 0.15);
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.motivation-widget__glow {
+  position: absolute;
+  top: -50%;
+  right: -20%;
+  width: 120px;
+  height: 120px;
+  background: radial-gradient(circle, rgba(255, 179, 0, 0.12) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.motivation-widget__icon {
+  font-size: 24px;
+  flex-shrink: 0;
+  animation: gentlePulse 3s ease-in-out infinite;
+}
+
+@keyframes gentlePulse {
+
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.15);
+  }
+}
+
+.motivation-widget__text {
+  font-size: 14px;
+  font-style: italic;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  flex: 1;
+}
+
+.motivation-widget__author {
+  font-style: normal;
+  font-weight: 600;
+  color: var(--amber);
+  font-size: 12px;
+}
+
+:root.light-theme .motivation-widget {
+  background: linear-gradient(135deg, rgba(230, 162, 0, 0.08) 0%, rgba(230, 162, 0, 0.03) 100%);
+  border-color: rgba(230, 162, 0, 0.2);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.04);
+}
+
+/* ─── 🔍 ARAMA ÇUBUĞU ────────────────────────────── */
+.search-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.search-bar__icon {
+  position: absolute;
+  left: 14px;
+  color: var(--text-muted);
+  pointer-events: none;
+  transition: color 0.2s ease;
+}
+
+.search-bar__input {
+  width: 100%;
+  padding: 12px 40px 12px 42px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 14px;
+  transition: all var(--transition);
+  outline: none;
+}
+
+.search-bar__input::placeholder {
+  color: var(--text-muted);
+}
+
+.search-bar__input:focus {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 3px var(--amber-glow);
+}
+
+.search-bar__input:focus~.search-bar__icon {
+  color: var(--amber);
+}
+
+.search-bar__clear {
+  position: absolute;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.search-bar__clear:hover {
+  background: rgba(244, 67, 54, 0.15);
+  color: #F44336;
+}
+
+:root.light-theme .search-bar__input {
+  background: #FFFFFF;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+:root.light-theme .search-bar__clear {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+/* ─── 👍 RSVP BUTTONS ──────────────────────────── */
+.rsvp-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 16px;
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.rsvp-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.rsvp-btn {
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.rsvp-btn:hover {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+
+.rsvp-btn--join.rsvp-btn--active {
+  background: rgba(76, 175, 80, 0.15);
+  color: #4CAF50;
+  border-color: rgba(76, 175, 80, 0.4);
+}
+
+.rsvp-btn--decline:hover {
+  border-color: rgba(244, 67, 54, 0.4);
+  color: #F44336;
+}
+
+.rsvp-count {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--amber);
+  background: var(--amber-glow);
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+}
+
+:root.light-theme .rsvp-count {
+  background: rgba(230, 162, 0, 0.12);
+}
+
+/* ─── RESPONSIVE: STAT KARTLARI (768px) ─────────── */
+@media (max-width: 768px) {
+  .stats-bar {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .stat-card {
+    padding: 12px 8px;
+  }
+
+  .stat-value {
+    font-size: 22px;
+  }
+
+  .stat-label {
+    font-size: 10px;
+  }
+
+  .motivation-widget {
+    padding: 12px 14px;
+    margin-bottom: 12px;
+  }
+
+  .motivation-widget__text {
+    font-size: 13px;
+  }
+
+  .search-bar__input {
+    padding: 10px 36px 10px 38px;
+    font-size: 13px;
+  }
+
+  .rsvp-section {
+    padding: 8px 12px;
+  }
+
+  .rsvp-btn {
+    font-size: 11px;
+    padding: 4px 10px;
+  }
+}
+
+@media (max-width: 640px) {
+  .motivation-widget__icon {
+    font-size: 20px;
+  }
+
+  .motivation-widget__text {
+    font-size: 12px;
+  }
+
+  .motivation-widget__author {
+    display: block;
+    margin-top: 2px;
+  }
+
+  .search-bar {
+    margin-bottom: 8px;
+  }
+}
+
+@media (max-width: 400px) {
+  .rsvp-buttons {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .rsvp-btn {
+    text-align: center;
+  }
 }

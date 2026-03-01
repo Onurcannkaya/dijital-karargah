@@ -3,7 +3,8 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#121212" />
   <meta name="description" content="Dijital Karargâh — Ajanda ve Görev Yönetim Komuta Merkezi" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -99,6 +100,13 @@
       </div>
     </header>
 
+    <!-- ─── MOTİVASYON WİDGET ──────────────────── -->
+    <div id="motivation-widget" class="motivation-widget">
+      <div class="motivation-widget__glow" aria-hidden="true"></div>
+      <span class="motivation-widget__icon" aria-hidden="true">💡</span>
+      <p id="motivation-text" class="motivation-widget__text">Yükleniyor...</p>
+    </div>
+
     <!-- ─── İSTATİSTİK BARI ───────────────────────── -->
     <section class="stats-bar" aria-label="Görev istatistikleri">
       <div class="stat-card">
@@ -121,6 +129,18 @@
         <div id="progress-fill" class="progress-bar__fill" style="width:0%"></div>
       </div>
       <span id="progress-text" class="progress-bar__text">0%</span>
+    </div>
+
+    <!-- ─── ARAMA ÇUBUĞU ────────────────────────── -->
+    <div class="search-bar">
+      <svg class="search-bar__icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2">
+        <circle cx="11" cy="11" r="8" />
+        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+      </svg>
+      <input id="search-input" type="text" class="search-bar__input" placeholder="Görev ara..." autocomplete="off" />
+      <button id="search-clear" class="search-bar__clear" type="button" aria-label="Temizle"
+        style="display:none;">✕</button>
     </div>
 
     <!-- ─── FİLTRE ÇUBUĞU ────────────────────────── -->
