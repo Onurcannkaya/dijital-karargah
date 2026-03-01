@@ -1,6 +1,6 @@
 /**
- * app.js — Dijital Karargâh v2.0 (Final Strike)
- * Auth + Calendar + Realtime + Notifications + Confetti + RSVP + Search + Motivasyon
+ * app.js — Dijital Karargâh v2.1 (Cerrahi Müdahale)
+ * Auth + Calendar + Realtime + Notifications + Confetti + RSVP + Search + Edit + Overdue
  */
 
 import { db, CATEGORIES } from './db.js';
@@ -19,7 +19,8 @@ const State = {
   selectedPriority: 'medium',
   notifiedTaskIds: new Set(),
   reminderInterval: null,
-  searchQuery: ''
+  searchQuery: '',
+  editingTaskId: null   // null = yeni görev, string = düzenleme modu
 };
 
 // ─────────────────────────────────────────────
@@ -102,6 +103,7 @@ function cacheDom() {
   DOM.motivationText = document.getElementById('motivation-text');
   DOM.searchInput = document.getElementById('search-input');
   DOM.searchClear = document.getElementById('search-clear');
+  DOM.modalHeading = document.getElementById('modal-heading');
 }
 
 // ─────────────────────────────────────────────
@@ -121,7 +123,7 @@ function formatDate(dateStr) {
 
 function isOverdue(dateStr) {
   if (!dateStr) return false;
-  return dateStr.split('T')[0] < new Date().toISOString().split('T')[0];
+  return new Date(dateStr) < new Date();
 }
 
 function isToday(dateStr) {
@@ -133,6 +135,12 @@ function escapeHtml(str) {
   const el = document.createElement('div');
   el.appendChild(document.createTextNode(str));
   return el.innerHTML;
+}
+
+/** E-posta adresinden kısa isim çıkar: "onurcan@mail.com" → "onurcan" */
+function emailToName(email) {
+  if (!email) return '?';
+  return email.split('@')[0];
 }
 
 // ─────────────────────────────────────────────
@@ -169,7 +177,7 @@ function initSearch() {
 }
 
 // ─────────────────────────────────────────────
-// 🎉 TOAST (Enhanced)
+// 🎉 TOAST
 // ─────────────────────────────────────────────
 function showToast(message, type = 'success') {
   const icons = { success: '✓', error: '✕', info: 'ℹ', warning: '⚠' };
@@ -356,7 +364,6 @@ function renderHeader() {
   const h = new Date().getHours();
   let g = h >= 5 && h < 12 ? 'Günaydın' : h < 17 ? 'İyi Günler' : h < 21 ? 'İyi Akşamlar' : 'İyi Geceler';
   DOM.greeting.textContent = `${g}, Komutan`;
-
   const now = new Date();
   const days = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
   const months = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
@@ -364,7 +371,7 @@ function renderHeader() {
 }
 
 // ─────────────────────────────────────────────
-// TASK CARD (RSVP + Shared Badges)
+// TASK CARD (Edit + RSVP Names + Overdue Alarm)
 // ─────────────────────────────────────────────
 function createTaskCard(task) {
   const cat = getCategoryById(task.categoryId);
@@ -381,20 +388,40 @@ function createTaskCard(task) {
   const assigneeLabel = task.assignedTo
     ? `<span class="assignee-label">👤 ${escapeHtml(task.assignedTo)}</span>` : '';
 
-  // RSVP section for shared tasks
-  const attendeeCount = Array.isArray(task.attendees) ? task.attendees.length : 0;
-  const userJoined = State.user && Array.isArray(task.attendees) && task.attendees.includes(State.user.email);
+  // Overdue alarm — kırmızı tarih etiketi + ⚠️ Gecikti!
+  const dateLabel = overdue
+    ? `<span class="overdue-label">⚠️ Gecikti!</span> ${formatDate(task.dueDate)}`
+    : today
+      ? 'Bugün'
+      : formatDate(task.dueDate);
+
+  // RSVP — katılımcı isimleri
+  const attendees = Array.isArray(task.attendees) ? task.attendees : [];
+  const attendeeCount = attendees.length;
+  const userJoined = State.user && attendees.includes(State.user.email);
+
+  // İsim listesi (max 3 isim göster, kalanını +X yap)
+  let attendeeNames = '';
+  if (attendeeCount > 0) {
+    const names = attendees.slice(0, 3).map(emailToName);
+    const extra = attendeeCount > 3 ? ` +${attendeeCount - 3}` : '';
+    attendeeNames = `<span class="rsvp-names" title="${attendees.join(', ')}">${names.join(', ')}${extra}</span>`;
+  }
+
   const rsvpHtml = isShared ? `
     <div class="rsvp-section">
       <div class="rsvp-buttons">
         <button class="rsvp-btn rsvp-btn--join ${userJoined ? 'rsvp-btn--active' : ''}" data-action="join" title="Katılıyorum">
           👍 Katılıyorum
         </button>
-        <button class="rsvp-btn rsvp-btn--decline ${!userJoined && attendeeCount > 0 ? '' : ''}" data-action="decline" title="Katılamam">
-          👎 Katılamam
+        <button class="rsvp-btn rsvp-btn--decline" data-action="decline" title="Katılamam">
+          👎 Pas
         </button>
       </div>
-      ${attendeeCount > 0 ? `<span class="rsvp-count">👥 ${attendeeCount} Kişi Katılıyor</span>` : ''}
+      <div class="rsvp-info">
+        ${attendeeCount > 0 ? `<span class="rsvp-count">👥 ${attendeeCount}</span>` : ''}
+        ${attendeeNames}
+      </div>
     </div>
   ` : '';
 
@@ -403,6 +430,9 @@ function createTaskCard(task) {
       <span class="task-badge" style="color:${cat.color}; background:${cat.bg}">${cat.icon} ${cat.label}</span>
       <div class="task-card__actions">
         ${sharedBadge}
+        <button class="btn-icon btn-edit" title="Düzenle" aria-label="Düzenle">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
         <button class="btn-icon btn-delete" title="Sil" aria-label="Sil">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
         </button>
@@ -418,7 +448,7 @@ function createTaskCard(task) {
       <div class="task-meta">
         <span class="task-date ${overdue ? 'task-date--overdue' : ''} ${today ? 'task-date--today' : ''}">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          ${today ? 'Bugün' : overdue ? '⚠ ' + formatDate(task.dueDate) : formatDate(task.dueDate)}
+          ${dateLabel}
         </span>
         ${assigneeLabel}
       </div>
@@ -427,10 +457,11 @@ function createTaskCard(task) {
     ${rsvpHtml}
   `;
 
+  // Event listeners
   card.querySelector('.task-check').addEventListener('click', () => handleToggle(task.id));
   card.querySelector('.btn-delete').addEventListener('click', () => handleDelete(task.id));
+  card.querySelector('.btn-edit').addEventListener('click', () => openEditModal(task));
 
-  // RSVP event listeners
   if (isShared) {
     card.querySelector('.rsvp-btn--join')?.addEventListener('click', () => handleRSVP(task.id, true));
     card.querySelector('.rsvp-btn--decline')?.addEventListener('click', () => handleRSVP(task.id, false));
@@ -461,15 +492,9 @@ async function renderTasks() {
   DOM.taskGrid.innerHTML = '';
   let tasks = State.tasks;
 
-  // Kategori filtresi
   if (State.activeFilter !== 'all') tasks = tasks.filter(t => t.categoryId === State.activeFilter);
+  if (State.searchQuery) tasks = tasks.filter(t => t.title.toLowerCase().includes(State.searchQuery));
 
-  // Arama filtresi
-  if (State.searchQuery) {
-    tasks = tasks.filter(t => t.title.toLowerCase().includes(State.searchQuery));
-  }
-
-  // Sıralama
   tasks = [...tasks].sort((a, b) => {
     if (a.completed !== b.completed) return a.completed ? 1 : -1;
     const pOrder = { high: 0, medium: 1, low: 2 };
@@ -525,24 +550,20 @@ function renderCalendar() {
   const monthNames = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
   DOM.calTitle.textContent = `${monthNames[mo]} ${yr}`;
   DOM.calDays.innerHTML = '';
-
   let startDay = new Date(yr, mo, 1).getDay() - 1;
   if (startDay < 0) startDay = 6;
   const daysInMonth = new Date(yr, mo + 1, 0).getDate();
   const todayStr = new Date().toISOString().split('T')[0];
-
   const tasksByDate = {};
   State.tasks.forEach(t => {
     const d = t.dueDate ? t.dueDate.split('T')[0] : null;
     if (d) { tasksByDate[d] = tasksByDate[d] || []; tasksByDate[d].push(t); }
   });
-
   for (let i = 0; i < startDay; i++) {
     const empty = document.createElement('div');
     empty.className = 'cal-day cal-day--empty';
     DOM.calDays.appendChild(empty);
   }
-
   for (let day = 1; day <= daysInMonth; day++) {
     const ds = `${yr}-${String(mo + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const cell = document.createElement('div');
@@ -617,18 +638,68 @@ async function handleToggle(id) {
   } catch (err) { showToast('Hata oluştu', 'error'); console.error(err); }
 }
 
+// 🗑️ DELETE — önce DB'den sil, sonra DOM güncelle
 async function handleDelete(id) {
-  const card = document.querySelector(`[data-id="${id}"]`);
-  if (card) { card.classList.add('card-exit'); await new Promise(r => setTimeout(r, 280)); }
   try {
     await db.deleteTask(id);
-    State.tasks = await db.getTasks();
+    // Başarılı → DOM animasyonu
+    const card = document.querySelector(`[data-id="${id}"]`);
+    if (card) {
+      card.classList.add('card-exit');
+      await new Promise(r => setTimeout(r, 280));
+    }
+    State.tasks = State.tasks.filter(t => t.id !== id);
     await renderTasks();
     if (State.activeView === 'calendar') renderCalendar();
-    showToast('Görev silindi');
-  } catch (err) { showToast('Silme başarısız', 'error'); }
+    showToast('Görev silindi 🗑️');
+  } catch (err) {
+    console.error('[App] Silme hatası:', err);
+    showToast(`Silme başarısız: ${err.message}`, 'error');
+  }
 }
 
+// ─────────────────────────────────────────────
+// ✏️ EDIT (Düzenleme) SİSTEMİ
+// ─────────────────────────────────────────────
+function openEditModal(task) {
+  State.editingTaskId = task.id;
+
+  // Modal başlığını değiştir
+  if (DOM.modalHeading) DOM.modalHeading.textContent = '✏️ Görevi Düzenle';
+
+  // Formu mevcut verilerle doldur
+  DOM.inputTitle.value = task.title;
+  DOM.selectedCategoryInput.value = task.categoryId;
+  DOM.inputDatetime.value = task.dueDate || '';
+  State.selectedPriority = task.priority || 'medium';
+
+  // Kategori chip'ini aktif et
+  DOM.chips.forEach(c => {
+    c.classList.toggle('chip--active', c.dataset.category === task.categoryId);
+  });
+
+  // Öncelik butonunu aktif et
+  DOM.priorityButtons.forEach(b => {
+    b.classList.toggle('priority-btn--active', b.dataset.priority === State.selectedPriority);
+  });
+
+  // Görünürlük
+  const isShared = task.visibility === 'shared';
+  DOM.inputVisibility.checked = isShared;
+  DOM.visibilityLabel.textContent = isShared ? '🌐 Ekiple Paylaş' : '🔒 Sadece Ben';
+  DOM.assigneeField.style.display = isShared ? '' : 'none';
+  DOM.inputAssignee.value = task.assignedTo || '';
+
+  // Modal'ı aç
+  DOM.modal.classList.add('modal--open');
+  DOM.modalOverlay.classList.add('overlay--open');
+  document.body.classList.add('body--modal-open');
+  setTimeout(() => DOM.inputTitle.focus(), 350);
+}
+
+// ─────────────────────────────────────────────
+// FORM SUBMIT (Yeni + Edit)
+// ─────────────────────────────────────────────
 async function handleFormSubmit(e) {
   e.preventDefault();
   const title = DOM.inputTitle.value.trim();
@@ -648,14 +719,21 @@ async function handleFormSubmit(e) {
   if (!categoryId) { showToast('Lütfen bir kategori seçin', 'error'); return; }
 
   try {
-    await db.addTask({ title, dueDate, categoryId, priority, visibility, assignedTo });
+    if (State.editingTaskId) {
+      // ✏️ DÜZENLEME MODU — updateTask
+      await db.updateTask(State.editingTaskId, { title, dueDate, categoryId, priority, visibility, assignedTo });
+      showToast('Görev güncellendi ✏️');
+    } else {
+      // ➕ YENİ GÖREV — addTask
+      await db.addTask({ title, dueDate, categoryId, priority, visibility, assignedTo });
+      showToast('Operasyon başlatıldı! ✅');
+    }
     State.tasks = await db.getTasks();
     closeModal();
     await renderTasks();
     if (State.activeView === 'calendar') renderCalendar();
-    showToast('Operasyon başlatıldı! ✅');
   } catch (err) {
-    showToast(`Görev eklenemedi: ${err.message}`, 'error');
+    showToast(`Hata: ${err.message}`, 'error');
   }
 }
 
@@ -663,6 +741,8 @@ async function handleFormSubmit(e) {
 // MODAL
 // ─────────────────────────────────────────────
 function openModal() {
+  State.editingTaskId = null;
+  if (DOM.modalHeading) DOM.modalHeading.textContent = 'Yeni Operasyon';
   DOM.taskForm.reset();
   DOM.inputTitle.value = '';
   DOM.selectedCategoryInput.value = '';
@@ -683,6 +763,7 @@ function openModal() {
 }
 
 function closeModal() {
+  State.editingTaskId = null;
   DOM.modal.classList.remove('modal--open');
   DOM.modalOverlay.classList.remove('overlay--open');
   document.body.classList.remove('body--modal-open');
@@ -743,7 +824,6 @@ function initKeyboardShortcuts() {
       e.preventDefault();
       openModal();
     }
-    // Ctrl+K → Arama çubuğuna odaklan
     if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
       e.preventDefault();
       DOM.searchInput?.focus();
@@ -795,7 +875,6 @@ async function init() {
   cacheDom();
   initTheme();
 
-  // FAB
   if (DOM.fab) {
     DOM.fab.addEventListener('click', (e) => {
       e.preventDefault(); e.stopPropagation();
@@ -803,7 +882,6 @@ async function init() {
     });
   }
 
-  // Modal controls
   DOM.modalClose?.addEventListener('click', closeModal);
   DOM.modalCancel?.addEventListener('click', closeModal);
   DOM.modalOverlay?.addEventListener('click', closeModal);
@@ -815,7 +893,7 @@ async function init() {
   initKeyboardShortcuts();
   initSearch();
 
-  // 🔐 Auth Persistence — session varsa LOGIN GÖSTERME, doğrudan dashboard aç
+  // 🔐 Auth Persistence
   const session = await db.getSession();
   if (session?.user) {
     State.user = session.user;

@@ -2374,3 +2374,101 @@ body,
     text-align: center;
   }
 }
+
+/* ─── ⚠️ OVERDUE LABEL ──────────────────────────────── */
+.overdue-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(244, 67, 54, 0.12);
+  color: #F44336;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  animation: overdueBlink 1.5s ease-in-out infinite;
+}
+
+@keyframes overdueBlink {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.task-date--overdue {
+  color: #F44336 !important;
+  font-weight: 600;
+}
+
+/* Overdue kart — kırmızı sol şerit */
+.task-card--overdue {
+  border-left: 3px solid #F44336;
+}
+
+:root.light-theme .overdue-label {
+  background: rgba(244, 67, 54, 0.1);
+}
+
+/* ─── ✏️ EDIT BUTTON ─────────────────────────────────── */
+.btn-edit {
+  color: var(--text-muted);
+  transition: all 0.2s ease;
+}
+
+.btn-edit:hover {
+  color: var(--amber);
+  transform: scale(1.15);
+}
+
+.task-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ─── 👥 RSVP INFO (İsim Listesi) ───────────────────── */
+.rsvp-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rsvp-names {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:root.light-theme .rsvp-names {
+  color: #4A5568;
+}
+
+@media (max-width: 640px) {
+  .rsvp-info {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .rsvp-names {
+    max-width: 150px;
+    font-size: 10px;
+  }
+
+  .overdue-label {
+    font-size: 10px;
+    padding: 1px 6px;
+  }
+}
