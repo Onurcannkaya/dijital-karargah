@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/badge/Version-1.0-FFB300?style=for-the-badge&logo=rocket&logoColor=white" />
   <img src="https://img.shields.io/badge/PWA-Ready-4CAF50?style=for-the-badge&logo=pwa&logoColor=white" />
   <img src="https://img.shields.io/badge/Supabase-Backend-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" />
-  <img src="https://img.shields.io/badge/Vercel-Deploy-000000?style=for-the-badge&logo=vercel&logoColor=white" />
+  <img src="https://img.shields.io/badge/Cloudflare-Pages-F38020?style=for-the-badge&logo=cloudflare&logoColor=white" />
 </p>
 
 > **Kişisel ve ekip görevlerini askeri disiplinle yöneten, bulut tabanlı PWA görev yönetim sistemi.**
@@ -34,7 +34,7 @@
 Frontend     → Vanilla JS (ES Modules), HTML5, CSS3
 Backend      → Supabase (PostgreSQL + Auth + Realtime)
 PWA          → Service Worker (Network-First cache stratejisi)
-Hosting      → Vercel
+Hosting      → Cloudflare Pages
 Tasarım      → BEM Metodolojisi, CSS Custom Properties
 Fontlar      → Space Grotesk + Barlow Condensed (Google Fonts)
 ```
@@ -159,7 +159,7 @@ Tam responsive tasarım — 375px'den 4K'ya kadar her ekranda kusursuz.
 
 ## 📄 Lisans
 
-Bu proje MIT Lisansı altında lisanslanmıştır.
+© 2026 Onurcan Kaya — Tüm hakları saklıdır.
 
 ---
 
