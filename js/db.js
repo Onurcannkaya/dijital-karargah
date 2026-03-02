@@ -190,8 +190,7 @@ class Database {
         .order('created_at', { ascending: false });
 
       if (user) {
-        query = query.or(`user_id.eq.${user.id},visibility.eq.shared`);
-        console.log('[DB] getTasks filtre: user_id =', user.id);
+        console.log('[DB] getTasks çağrılıyor. Kullanıcı:', user.id);
       }
 
       const { data, error } = await query;

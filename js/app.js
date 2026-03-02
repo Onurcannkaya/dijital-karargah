@@ -226,10 +226,18 @@ function oneSignalLogin(user) {
   if (!user) return;
   window.OneSignalDeferred = window.OneSignalDeferred || [];
   window.OneSignalDeferred.push(function (OneSignal) {
-    OneSignal.login(user.id);
-    // Opsiyonel: e-posta etiketini de ekle
-    OneSignal.User.addEmail(user.email);
-    console.log('[OneSignal] Kullanıcı login:', user.id);
+    try {
+      if (OneSignal.User) {
+        OneSignal.login(user.id);
+        // addEmail causes TypeError if OneSignal isn't fully ready, wrap it safely
+        if (typeof OneSignal.User.addEmail === 'function') {
+          OneSignal.User.addEmail(user.email);
+        }
+        console.log('[OneSignal] Kullanıcı login:', user.id);
+      }
+    } catch (e) {
+      console.warn('[OneSignal] Login işlemi sırasında hata (Önemsiz):', e.message);
+    }
   });
 }
 

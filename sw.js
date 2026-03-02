@@ -1,5 +1,5 @@
 // sw.js — Dijital Karargâh Service Worker (Production + Push)
-const CACHE_NAME = 'karargah-v2.1-push';
+const CACHE_NAME = 'karargah-v2.2-fix';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
