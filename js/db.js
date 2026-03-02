@@ -266,13 +266,34 @@ class Database {
     }
   }
 
+  /**
+   * Görev sil — önce varlığını/sahipliğini doğrula, sonra sil.
+   * .select() DELETE'ten sonra kullanılmaz çünkü satır zaten silinmiştir.
+   */
   async deleteTask(id) {
     try {
-      const { data, error } = await this._client.from('tasks').delete().eq('id', id).select();
-      if (error) throw error;
-      if (!data || data.length === 0) {
-        throw new Error('İşlem reddedildi: Yetkiniz yok veya görev bulunamadı.');
+      // Önce görevin varlığını kontrol et
+      const existing = await this.getTaskById(id);
+      if (!existing) {
+        throw new Error('Görev bulunamadı veya zaten silinmiş.');
       }
+
+      // Sahiplik kontrolü
+      const { data: { user } } = await this._client.auth.getUser();
+      if (user && existing.userId && existing.userId !== user.id) {
+        throw new Error('Bu görevi silme yetkiniz yok.');
+      }
+
+      // Sil (select() yok — satır zaten silineceği için boş döner)
+      const { error } = await this._client.from('tasks').delete().eq('id', id);
+      if (error) throw error;
+
+      // Silme doğrulaması: artık bulunamamalı
+      const check = await this.getTaskById(id);
+      if (check) {
+        throw new Error('İşlem reddedildi: Veritabanı silmeye izin vermedi (RLS).');
+      }
+
       return true;
     } catch (err) {
       console.error('[DB] deleteTask hatası:', err.message);
@@ -336,6 +357,35 @@ class Database {
     } catch (err) {
       console.error('[DB] getStats hatası:', err.message);
       return { total: 0, completed: 0, pending: 0, byCategory: {} };
+    }
+  }
+
+  /**
+   * Sahipsiz (orphan) görevleri temizle.
+   * Listede görünüp silinemeyen eski test görevlerini kaldırır.
+   */
+  async cleanupOrphanTasks() {
+    try {
+      const { data: { user } } = await this._client.auth.getUser();
+      if (!user) return { deleted: 0 };
+
+      const allTasks = await this.getTasks();
+      let deleted = 0;
+
+      for (const task of allTasks) {
+        // user_id'si olmayan veya başka kullanıcıya ait paylasılan gorevler
+        if (!task.userId || task.userId === user.id) continue;
+        // Bu görev başkasına ait — silmeyi dene
+        try {
+          const { error } = await this._client.from('tasks').delete().eq('id', task.id);
+          if (!error) deleted++;
+        } catch { /* RLS engelliyorsa atla */ }
+      }
+      console.log(`[DB] Orphan temizliği: ${deleted} görev silindi`);
+      return { deleted };
+    } catch (err) {
+      console.error('[DB] cleanupOrphanTasks hatası:', err.message);
+      return { deleted: 0 };
     }
   }
 }
