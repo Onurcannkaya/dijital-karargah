@@ -507,6 +507,7 @@ async function handleRSVP(taskId, isJoining) {
 async function renderTasks() {
   DOM.taskGrid.innerHTML = '';
   let tasks = State.tasks;
+  console.log('[Render] renderTasks çağrıldı — toplam:', tasks.length, 'filtre:', State.activeFilter);
 
   if (State.activeFilter !== 'all') tasks = tasks.filter(t => t.categoryId === State.activeFilter);
   if (State.searchQuery) tasks = tasks.filter(t => t.title.toLowerCase().includes(State.searchQuery));
@@ -747,17 +748,21 @@ async function handleFormSubmit(e) {
     } else {
       // ➕ YENİ GÖREV — addTask
       const newTask = await db.addTask({ title, dueDate, categoryId, priority, visibility, assignedTo });
+      console.log('[App] Yeni görev eklendi:', newTask);
       showToast('Operasyon başlatıldı! ✅');
       // Shared görev eklendiyse push bildirim tetikle
       if (visibility === 'shared' && newTask) {
         triggerPushForSharedTask(newTask);
       }
     }
+    // ✅ DB'den güncel listeyi çek
     State.tasks = await db.getTasks();
+    console.log('[App] Form sonrası görev sayısı:', State.tasks.length);
     closeModal();
     await renderTasks();
     if (State.activeView === 'calendar') renderCalendar();
   } catch (err) {
+    console.error('[App] Form hatası:', err);
     showToast(`Hata: ${err.message}`, 'error');
   } finally {
     if (submitBtn) submitBtn.disabled = false;

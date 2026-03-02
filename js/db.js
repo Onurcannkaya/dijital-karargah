@@ -191,10 +191,12 @@ class Database {
 
       if (user) {
         query = query.or(`user_id.eq.${user.id},visibility.eq.shared`);
+        console.log('[DB] getTasks filtre: user_id =', user.id);
       }
 
       const { data, error } = await query;
       if (error) throw error;
+      console.log('[DB] getTasks: ham veri', data?.length, 'satır');
       return (data || []).map(toCamelCase);
     } catch (err) {
       console.error('[DB] getTasks hatası:', err.message);
@@ -230,17 +232,24 @@ class Database {
         attendees: []
       };
 
+      console.log('[DB] addTask: ekleniyor...', { title: row.title, user_id: row.user_id, visibility: row.visibility });
+
       const { data, error } = await this._client.from('tasks').insert([row]).select();
 
       if (error) {
         console.error('[DB] Supabase Insert Error:', error.message, error.details, error.hint);
         throw error;
       }
+
+      console.log('[DB] addTask: sonuç data =', data);
+
       if (!data || data.length === 0) {
         throw new Error('İşlem reddedildi: Görev eklenemedi (yetki veya veri hatası).');
       }
 
-      return toCamelCase(data[0]);
+      const result = toCamelCase(data[0]);
+      console.log('[DB] addTask: başarılı, id =', result.id);
+      return result;
     } catch (err) {
       console.error('[DB] addTask genel hatası:', err.message);
       throw err;
