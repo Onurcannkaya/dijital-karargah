@@ -276,33 +276,22 @@ class Database {
   }
 
   /**
-   * Görev sil — önce varlığını/sahipliğini doğrula, sonra sil.
-   * .select() DELETE'ten sonra kullanılmaz çünkü satır zaten silinmiştir.
+   * Görev sil — sahiplik doğrulaması + basit silme.
    */
   async deleteTask(id) {
     try {
-      // Önce görevin varlığını kontrol et
-      const existing = await this.getTaskById(id);
-      if (!existing) {
-        throw new Error('Görev bulunamadı veya zaten silinmiş.');
-      }
-
       // Sahiplik kontrolü
       const { data: { user } } = await this._client.auth.getUser();
-      if (user && existing.userId && existing.userId !== user.id) {
-        throw new Error('Bu görevi silme yetkiniz yok.');
-      }
+      if (!user) throw new Error('Silmek için giriş yapmalısınız.');
 
-      // Sil (select() yok — satır zaten silineceği için boş döner)
+      // Sil
       const { error } = await this._client.from('tasks').delete().eq('id', id);
-      if (error) throw error;
-
-      // Silme doğrulaması: artık bulunamamalı
-      const check = await this.getTaskById(id);
-      if (check) {
-        throw new Error('İşlem reddedildi: Veritabanı silmeye izin vermedi (RLS).');
+      if (error) {
+        console.error('[DB] Supabase Delete Error:', error);
+        throw new Error(`Silme hatası: ${error.message}`);
       }
 
+      console.log('[DB] deleteTask: başarılı, id =', id);
       return true;
     } catch (err) {
       console.error('[DB] deleteTask hatası:', err.message);
