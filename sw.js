@@ -1,5 +1,5 @@
 // sw.js — Dijital Karargâh Service Worker (Production + Push)
-const CACHE_NAME = 'karargah-v2.2-fix';
+const CACHE_NAME = 'karargah-v2.3-api-fix';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -38,6 +38,12 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
+
+  // KRİTİK DÜZELTME: API çağrılarını ASLA önbelleğe alma
+  if (url.hostname.includes('supabase.co') || url.hostname.includes('onesignal.com')) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
 
   // JS ve CSS dosyaları → Önce ağı dene (NETWORK-FIRST)
   if (url.pathname.endsWith('.js') || url.pathname.endsWith('.css')) {
