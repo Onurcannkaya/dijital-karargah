@@ -7,7 +7,7 @@
 // SUPABASE İSTEMCİSİ
 // ─────────────────────────────────────────────
 const supabaseUrl = 'https://rnvzzkajaxxjpkltvorv.supabase.co';
-const supabaseKey = 'sb_publishable_gGrAF3r6BSpjw5yBjzdBdQ_iU2k4L26';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJudnp6a2FqYXh4anBrbHR2b3J2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzNjEzMzMsImV4cCI6MjA4NzkzNzMzM30.6NxzAeAMBX93JNFk0K_kJ8PzXGBpVSS2Id6PNSJhJts';
 const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
 // ─────────────────────────────────────────────
