@@ -225,11 +225,10 @@ function spawnConfetti(targetEl) {
 function oneSignalLogin(user) {
   if (!user) return;
   window.OneSignalDeferred = window.OneSignalDeferred || [];
-  window.OneSignalDeferred.push(function (OneSignal) {
+  window.OneSignalDeferred.push(async function (OneSignal) {
     try {
       if (OneSignal.User) {
-        OneSignal.login(user.id);
-        // addEmail causes TypeError if OneSignal isn't fully ready, wrap it safely
+        await OneSignal.login(user.id);
         if (typeof OneSignal.User.addEmail === 'function') {
           OneSignal.User.addEmail(user.email);
         }
