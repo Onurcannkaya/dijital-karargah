@@ -368,35 +368,6 @@ class Database {
       return { total: 0, completed: 0, pending: 0, byCategory: {} };
     }
   }
-
-  /**
-   * Sahipsiz (orphan) görevleri temizle.
-   * Listede görünüp silinemeyen eski test görevlerini kaldırır.
-   */
-  async cleanupOrphanTasks() {
-    try {
-      const { data: { user } } = await this._client.auth.getUser();
-      if (!user) return { deleted: 0 };
-
-      const allTasks = await this.getTasks();
-      let deleted = 0;
-
-      for (const task of allTasks) {
-        // user_id'si olmayan veya başka kullanıcıya ait paylasılan gorevler
-        if (!task.userId || task.userId === user.id) continue;
-        // Bu görev başkasına ait — silmeyi dene
-        try {
-          const { error } = await this._client.from('tasks').delete().eq('id', task.id);
-          if (!error) deleted++;
-        } catch { /* RLS engelliyorsa atla */ }
-      }
-      console.log(`[DB] Orphan temizliği: ${deleted} görev silindi`);
-      return { deleted };
-    } catch (err) {
-      console.error('[DB] cleanupOrphanTasks hatası:', err.message);
-      return { deleted: 0 };
-    }
-  }
 }
 
 export const db = new Database();

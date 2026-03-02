@@ -990,14 +990,6 @@ async function loadDashboard() {
     await db.init();
     State.tasks = await db.getTasks();
     console.log(`[App] ${State.tasks.length} görev yüklendi`);
-
-    // İlk yüklemede orphan görevleri temizle
-    const cleanup = await db.cleanupOrphanTasks();
-    if (cleanup.deleted > 0) {
-      console.log(`[App] ${cleanup.deleted} sahipsiz görev temizlendi`);
-      State.tasks = await db.getTasks();
-      showToast(`${cleanup.deleted} eski görev temizlendi`, 'info');
-    }
   } catch (err) {
     console.error('[App] DB hatası:', err);
     showToast('Bulut bağlantısı kurulamadı', 'error');
