@@ -25,6 +25,9 @@ export const CATEGORIES = [
 // ─────────────────────────────────────────────
 
 function toCamelCase(row) {
+  if (!row.id) {
+    console.warn('[DB] toCamelCase: satırda id eksik!', row);
+  }
   return {
     id: row.id,
     title: row.title,

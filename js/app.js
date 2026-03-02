@@ -218,21 +218,39 @@ function spawnConfetti(targetEl) {
 }
 
 // ─────────────────────────────────────────────
-// 🔔 WEB NOTIFICATIONS
+// 🔔 ONESIGNAL — Bildirim İzni & Gönderim
 // ─────────────────────────────────────────────
-async function requestNotificationPermission() {
-  if (!('Notification' in window)) return;
-  if (Notification.permission === 'default') {
-    const perm = await Notification.requestPermission();
-    if (perm === 'granted') showToast('Bildirimler aktif 🔔', 'info');
-  }
+
+/** OneSignal üzerinden kullanıcıyı login et (push hedefleme için) */
+function oneSignalLogin(user) {
+  if (!user) return;
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  window.OneSignalDeferred.push(function (OneSignal) {
+    OneSignal.login(user.id);
+    // Opsiyonel: e-posta etiketini de ekle
+    OneSignal.User.addEmail(user.email);
+    console.log('[OneSignal] Kullanıcı login:', user.id);
+  });
+}
+
+/** OneSignal'dan kullanıcı logout */
+function oneSignalLogout() {
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  window.OneSignalDeferred.push(function (OneSignal) {
+    OneSignal.logout();
+    console.log('[OneSignal] Kullanıcı logout');
+  });
 }
 
 function sendNotification(title, body) {
-  if (!('Notification' in window) || Notification.permission !== 'granted') return;
-  try {
-    new Notification(title, { body, icon: '/icons/icon-192x192.png', badge: '/icons/icon-72x72.png', tag: body });
-  } catch { /* SW fallback */ }
+  // Artık OneSignal push sunucusu üzerinden gönderilir.
+  // Local fallback olarak SW postMessage kullanılır.
+  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({
+      type: 'SHOW_NOTIFICATION',
+      payload: { title, body, url: '/' }
+    });
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -331,7 +349,7 @@ function initAuth() {
         updateUserBar(State.user);
         hideAuth();
         await loadDashboard();
-        requestNotificationPermission();
+        oneSignalLogin(State.user);
         startRealtime();
         startReminderEngine();
         showToast('Hoş geldin, Komutan! 🎖️');
@@ -346,6 +364,7 @@ function initAuth() {
   DOM.btnLogout.addEventListener('click', async () => {
     try {
       stopReminderEngine();
+      oneSignalLogout();
       await db.signOut();
       State.user = null;
       State.tasks = [];
@@ -457,14 +476,37 @@ function createTaskCard(task) {
     ${rsvpHtml}
   `;
 
-  // Event listeners
-  card.querySelector('.task-check').addEventListener('click', () => handleToggle(task.id));
-  card.querySelector('.btn-delete').addEventListener('click', () => handleDelete(task.id));
-  card.querySelector('.btn-edit').addEventListener('click', () => openEditModal(task));
+  // Event listeners — defensive: DOM dataset.id > closure
+  const _getCardId = () => card.dataset.id || task.id;
+
+  card.querySelector('.task-check').addEventListener('click', () => {
+    const id = _getCardId();
+    if (!id) { console.error('[App] toggle — görev ID bulunamadı'); return; }
+    handleToggle(id);
+  });
+  card.querySelector('.btn-delete').addEventListener('click', () => {
+    const id = _getCardId();
+    if (!id) { console.error('[App] delete — görev ID bulunamadı'); return; }
+    handleDelete(id);
+  });
+  card.querySelector('.btn-edit').addEventListener('click', () => {
+    const id = _getCardId();
+    if (!id) { console.error('[App] edit — görev ID bulunamadı'); return; }
+    const currentTask = State.tasks.find(t => t.id === id) || task;
+    openEditModal(currentTask);
+  });
 
   if (isShared) {
-    card.querySelector('.rsvp-btn--join')?.addEventListener('click', () => handleRSVP(task.id, true));
-    card.querySelector('.rsvp-btn--decline')?.addEventListener('click', () => handleRSVP(task.id, false));
+    card.querySelector('.rsvp-btn--join')?.addEventListener('click', () => {
+      const id = _getCardId();
+      if (!id) { console.error('[App] RSVP join — görev ID bulunamadı'); return; }
+      handleRSVP(id, true);
+    });
+    card.querySelector('.rsvp-btn--decline')?.addEventListener('click', () => {
+      const id = _getCardId();
+      if (!id) { console.error('[App] RSVP decline — görev ID bulunamadı'); return; }
+      handleRSVP(id, false);
+    });
   }
 
   return card;
@@ -474,6 +516,7 @@ function createTaskCard(task) {
 // RSVP HANDLER
 // ─────────────────────────────────────────────
 async function handleRSVP(taskId, isJoining) {
+  if (!taskId || taskId === 'undefined') { console.error('[App] handleRSVP: geçersiz id', taskId); showToast('Görev bulunamadı', 'error'); return; }
   if (!State.user) { showToast('RSVP için giriş yapmalısınız', 'error'); return; }
   try {
     await db.rsvpTask(taskId, State.user.email, isJoining);
@@ -625,6 +668,7 @@ function initViewTabs() {
 // HANDLERS
 // ─────────────────────────────────────────────
 async function handleToggle(id) {
+  if (!id || id === 'undefined') { console.error('[App] handleToggle: geçersiz id', id); showToast('Görev bulunamadı', 'error'); return; }
   try {
     const updated = await db.toggleTask(id);
     State.tasks = await db.getTasks();
@@ -640,6 +684,7 @@ async function handleToggle(id) {
 
 // 🗑️ DELETE — önce DB'den sil, sonra DOM güncelle
 async function handleDelete(id) {
+  if (!id || id === 'undefined') { console.error('[App] handleDelete: geçersiz id', id); showToast('Görev bulunamadı', 'error'); return; }
   try {
     await db.deleteTask(id);
     // Başarılı → DOM animasyonu
@@ -718,6 +763,10 @@ async function handleFormSubmit(e) {
   }
   if (!categoryId) { showToast('Lütfen bir kategori seçin', 'error'); return; }
 
+  // UI kilit — çift tıklama koruması
+  const submitBtn = DOM.taskForm.querySelector('[type="submit"]');
+  if (submitBtn) submitBtn.disabled = true;
+
   try {
     if (State.editingTaskId) {
       // ✏️ DÜZENLEME MODU — updateTask
@@ -725,8 +774,12 @@ async function handleFormSubmit(e) {
       showToast('Görev güncellendi ✏️');
     } else {
       // ➕ YENİ GÖREV — addTask
-      await db.addTask({ title, dueDate, categoryId, priority, visibility, assignedTo });
+      const newTask = await db.addTask({ title, dueDate, categoryId, priority, visibility, assignedTo });
       showToast('Operasyon başlatıldı! ✅');
+      // Shared görev eklendiyse push bildirim tetikle
+      if (visibility === 'shared' && newTask) {
+        triggerPushForSharedTask(newTask);
+      }
     }
     State.tasks = await db.getTasks();
     closeModal();
@@ -734,6 +787,8 @@ async function handleFormSubmit(e) {
     if (State.activeView === 'calendar') renderCalendar();
   } catch (err) {
     showToast(`Hata: ${err.message}`, 'error');
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
   }
 }
 
@@ -843,11 +898,65 @@ function toggleTheme() {
   localStorage.setItem(THEME_KEY, isLight ? 'light' : 'dark');
 }
 
-// ─── SW ───────────────────────────────────────
+// ─── ONESIGNAL INIT & SW ──────────────────────
+
+/**
+ * OneSignal Web Push SDK başlatma.
+ * Bildirim izni, subscription yönetimi ve push delivery
+ * tamamen OneSignal tarafından yönetilir.
+ */
+function initOneSignal() {
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  window.OneSignalDeferred.push(async function (OneSignal) {
+    await OneSignal.init({
+      appId: 'dd93bcf1-fcb3-4077-b35d-a7a462867cfc',
+      safari_web_id: 'web.onesignal.auto.56640081-e0ac-44c5-9d26-db4b2624f604',
+      notifyButton: {
+        enable: true,
+        text: {
+          'tip.state.unsubscribed': 'Bildirimleri Aç',
+          'tip.state.subscribed': 'Bildirimler Açık',
+          'tip.state.blocked': 'Bildirimler Engellendi',
+          'message.prenotify': 'Bildirimleri açmak için tıklayın',
+          'message.action.subscribed': 'Bildirimler açıldı!',
+          'message.action.resubscribed': 'Bildirimler yeniden açıldı!',
+          'message.action.unsubscribed': 'Bildirimler kapatıldı'
+        }
+      },
+      allowLocalhostAsSecureOrigin: true
+    });
+    console.log('[OneSignal] SDK başarılı şekilde başlatıldı');
+  });
+}
+
+/** Cache-only Service Worker kaydı (OneSignal kendi SW'sini yönetir) */
 function registerServiceWorker() {
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(e => console.warn('[SW]', e));
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('/sw.js')
+    .then(reg => console.log('[SW] Kayıt başarılı:', reg.scope))
+    .catch(e => console.warn('[SW] Kayıt hatası:', e));
+}
+
+/**
+ * Shared görev eklendiğinde OneSignal push bildirimi tetikleme.
+ * OneSignal REST API veya dashboard üzerinden segmentlere bildirim gönderilebilir.
+ * Burada local SW fallback kullanılır.
+ */
+function triggerPushForSharedTask(task) {
+  // Local SW bildirim (uygulama açıkken)
+  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({
+      type: 'SHOW_NOTIFICATION',
+      payload: {
+        title: '📣 Yeni Ortak Plan',
+        body: `${task.title} — Katılmak ister misin?`,
+        url: '/'
+      }
+    });
   }
+  console.log('[OneSignal] Shared görev bildirimi tetiklendi:', task.title);
+  // Not: Diğer kullanıcılara push göndermek için OneSignal REST API kullanın:
+  // POST https://onesignal.com/api/v1/notifications
 }
 
 // ─────────────────────────────────────────────
@@ -900,7 +1009,7 @@ async function init() {
     updateUserBar(State.user);
     hideAuth();
     await loadDashboard();
-    requestNotificationPermission();
+    oneSignalLogin(State.user);
     startRealtime();
     startReminderEngine();
   } else {
@@ -913,6 +1022,7 @@ async function init() {
   initCalendar();
   DOM.themeToggle?.addEventListener('click', toggleTheme);
   setInterval(renderHeader, 60000);
+  initOneSignal();
   registerServiceWorker();
 }
 
