@@ -236,6 +236,9 @@ class Database {
         console.error('[DB] Supabase Insert Error:', error.message, error.details, error.hint);
         throw error;
       }
+      if (!data || data.length === 0) {
+        throw new Error('İşlem reddedildi: Görev eklenemedi (yetki veya veri hatası).');
+      }
 
       return toCamelCase(data[0]);
     } catch (err) {
@@ -253,6 +256,9 @@ class Database {
         .update({ completed: !current.completed })
         .eq('id', id).select();
       if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error('İşlem reddedildi: Görev güncellenemedi (yetki hatası).');
+      }
       return toCamelCase(data[0]);
     } catch (err) {
       console.error('[DB] toggleTask hatası:', err.message);
@@ -262,8 +268,11 @@ class Database {
 
   async deleteTask(id) {
     try {
-      const { error } = await this._client.from('tasks').delete().eq('id', id);
+      const { data, error } = await this._client.from('tasks').delete().eq('id', id).select();
       if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error('İşlem reddedildi: Yetkiniz yok veya görev bulunamadı.');
+      }
       return true;
     } catch (err) {
       console.error('[DB] deleteTask hatası:', err.message);
@@ -276,6 +285,9 @@ class Database {
       const row = toSnakeCase(updates);
       const { data, error } = await this._client.from('tasks').update(row).eq('id', id).select();
       if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error('İşlem reddedildi: Görev güncellenemedi (yetki veya ID hatası).');
+      }
       return toCamelCase(data[0]);
     } catch (err) {
       console.error('[DB] updateTask hatası:', err.message);
@@ -302,6 +314,9 @@ class Database {
       const { data, error } = await this._client
         .from('tasks').update({ attendees }).eq('id', id).select();
       if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error('İşlem reddedildi: RSVP güncellenemedi.');
+      }
       return toCamelCase(data[0]);
     } catch (err) {
       console.error('[DB] rsvpTask hatası:', err.message);

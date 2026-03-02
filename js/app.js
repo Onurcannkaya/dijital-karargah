@@ -638,6 +638,7 @@ async function handleToggle(id) {
   if (!id || id === 'undefined') { console.error('[App] handleToggle: geçersiz id', id); showToast('Görev bulunamadı', 'error'); return; }
   try {
     const updated = await db.toggleTask(id);
+    // ✅ Başarılı — DB'den güncel listeyi çek, baştan çiz
     State.tasks = await db.getTasks();
     if (updated.completed) {
       const cardEl = document.querySelector(`[data-id="${id}"]`);
@@ -646,21 +647,19 @@ async function handleToggle(id) {
     await renderTasks();
     if (State.activeView === 'calendar') renderCalendar();
     showToast(updated.completed ? 'Görev tamamlandı! 🎯' : 'Görev geri alındı');
-  } catch (err) { showToast('Hata oluştu', 'error'); console.error(err); }
+  } catch (err) {
+    console.error('[App] Toggle hatası:', err);
+    showToast(`İşlem başarısız: ${err.message}`, 'error');
+  }
 }
 
-// 🗑️ DELETE — önce DB'den sil, sonra DOM güncelle
+// 🗑️ DELETE — DB doğrulaması sonrası güncel listeyi çek
 async function handleDelete(id) {
   if (!id || id === 'undefined') { console.error('[App] handleDelete: geçersiz id', id); showToast('Görev bulunamadı', 'error'); return; }
   try {
     await db.deleteTask(id);
-    // Başarılı → DOM animasyonu
-    const card = document.querySelector(`[data-id="${id}"]`);
-    if (card) {
-      card.classList.add('card-exit');
-      await new Promise(r => setTimeout(r, 280));
-    }
-    State.tasks = State.tasks.filter(t => t.id !== id);
+    // ✅ Başarılı — DB'den güncel listeyi çek, baştan çiz
+    State.tasks = await db.getTasks();
     await renderTasks();
     if (State.activeView === 'calendar') renderCalendar();
     showToast('Görev silindi 🗑️');
