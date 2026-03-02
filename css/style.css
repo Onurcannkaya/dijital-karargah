@@ -327,7 +327,7 @@ body::before {
 .task-card__actions {
   display: flex;
   gap: 4px;
-  opacity: 0;
+  opacity: 0.7;
   transition: opacity var(--transition);
 }
 
