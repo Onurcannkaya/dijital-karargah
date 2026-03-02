@@ -476,39 +476,6 @@ function createTaskCard(task) {
     ${rsvpHtml}
   `;
 
-  // Event listeners — defensive: DOM dataset.id > closure
-  const _getCardId = () => card.dataset.id || task.id;
-
-  card.querySelector('.task-check').addEventListener('click', () => {
-    const id = _getCardId();
-    if (!id) { console.error('[App] toggle — görev ID bulunamadı'); return; }
-    handleToggle(id);
-  });
-  card.querySelector('.btn-delete').addEventListener('click', () => {
-    const id = _getCardId();
-    if (!id) { console.error('[App] delete — görev ID bulunamadı'); return; }
-    handleDelete(id);
-  });
-  card.querySelector('.btn-edit').addEventListener('click', () => {
-    const id = _getCardId();
-    if (!id) { console.error('[App] edit — görev ID bulunamadı'); return; }
-    const currentTask = State.tasks.find(t => t.id === id) || task;
-    openEditModal(currentTask);
-  });
-
-  if (isShared) {
-    card.querySelector('.rsvp-btn--join')?.addEventListener('click', () => {
-      const id = _getCardId();
-      if (!id) { console.error('[App] RSVP join — görev ID bulunamadı'); return; }
-      handleRSVP(id, true);
-    });
-    card.querySelector('.rsvp-btn--decline')?.addEventListener('click', () => {
-      const id = _getCardId();
-      if (!id) { console.error('[App] RSVP decline — görev ID bulunamadı'); return; }
-      handleRSVP(id, false);
-    });
-  }
-
   return card;
 }
 
@@ -902,8 +869,6 @@ function toggleTheme() {
 
 /**
  * OneSignal Web Push SDK başlatma.
- * Bildirim izni, subscription yönetimi ve push delivery
- * tamamen OneSignal tarafından yönetilir.
  */
 function initOneSignal() {
   window.OneSignalDeferred = window.OneSignalDeferred || [];
@@ -929,7 +894,6 @@ function initOneSignal() {
   });
 }
 
-/** Cache-only Service Worker kaydı (OneSignal kendi SW'sini yönetir) */
 function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   navigator.serviceWorker.register('/sw.js')
@@ -937,26 +901,75 @@ function registerServiceWorker() {
     .catch(e => console.warn('[SW] Kayıt hatası:', e));
 }
 
-/**
- * Shared görev eklendiğinde OneSignal push bildirimi tetikleme.
- * OneSignal REST API veya dashboard üzerinden segmentlere bildirim gönderilebilir.
- * Burada local SW fallback kullanılır.
- */
 function triggerPushForSharedTask(task) {
-  // Local SW bildirim (uygulama açıkken)
   if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
     navigator.serviceWorker.controller.postMessage({
       type: 'SHOW_NOTIFICATION',
-      payload: {
-        title: '📣 Yeni Ortak Plan',
-        body: `${task.title} — Katılmak ister misin?`,
-        url: '/'
-      }
+      payload: { title: '📣 Yeni Ortak Plan', body: `${task.title} — Katılmak ister misin?`, url: '/' }
     });
   }
   console.log('[OneSignal] Shared görev bildirimi tetiklendi:', task.title);
-  // Not: Diğer kullanıcılara push göndermek için OneSignal REST API kullanın:
-  // POST https://onesignal.com/api/v1/notifications
+}
+
+// ─────────────────────────────────────────────
+// 🎯 EVENT DELEGATION (Tek Listener Mimarisi)
+// ─────────────────────────────────────────────
+
+/**
+ * Task grid'e TEK bir click listener ekler.
+ * Tüm kart içi buton tıklamaları closest() ile
+ * ayrıştırılır — kart başına listener aşırı yükü ortadan kalkar.
+ */
+function initTaskGridDelegation() {
+  if (!DOM.taskGrid) return;
+
+  DOM.taskGrid.addEventListener('click', async (e) => {
+    // ─── Kart ID'sini bul ───
+    const card = e.target.closest('.task-card');
+    if (!card) return;
+    const id = card.dataset.id;
+    if (!id || id === 'undefined') {
+      console.error('[Delegation] Geçersiz kart ID:', id);
+      return;
+    }
+
+    // ✅ TAMAMLA / GERİ AL
+    if (e.target.closest('.task-check')) {
+      e.stopPropagation();
+      await handleToggle(id);
+      return;
+    }
+
+    // 🗑️ SİL
+    if (e.target.closest('.btn-delete')) {
+      e.stopPropagation();
+      await handleDelete(id);
+      return;
+    }
+
+    // ✏️ DÜZENLE
+    if (e.target.closest('.btn-edit')) {
+      e.stopPropagation();
+      const task = State.tasks.find(t => t.id === id);
+      if (task) openEditModal(task);
+      else showToast('Görev bulunamadı', 'error');
+      return;
+    }
+
+    // 👍 RSVP KATILIYORUM
+    if (e.target.closest('.rsvp-btn--join')) {
+      e.stopPropagation();
+      await handleRSVP(id, true);
+      return;
+    }
+
+    // 👎 RSVP PAS
+    if (e.target.closest('.rsvp-btn--decline')) {
+      e.stopPropagation();
+      await handleRSVP(id, false);
+      return;
+    }
+  });
 }
 
 // ─────────────────────────────────────────────
@@ -984,17 +997,28 @@ async function init() {
   cacheDom();
   initTheme();
 
-  if (DOM.fab) {
-    DOM.fab.addEventListener('click', (e) => {
-      e.preventDefault(); e.stopPropagation();
-      openModal();
-    });
+  // 🟢 FAB & Modal — render hatalarından bağımsız, try-catch korumalı
+  try {
+    if (DOM.fab) {
+      DOM.fab.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        openModal();
+      });
+    }
+    DOM.modalClose?.addEventListener('click', closeModal);
+    DOM.modalCancel?.addEventListener('click', closeModal);
+    DOM.modalOverlay?.addEventListener('click', closeModal);
+    DOM.taskForm?.addEventListener('submit', handleFormSubmit);
+  } catch (err) {
+    console.error('[App] FAB/Modal bağlama hatası:', err);
   }
 
-  DOM.modalClose?.addEventListener('click', closeModal);
-  DOM.modalCancel?.addEventListener('click', closeModal);
-  DOM.modalOverlay?.addEventListener('click', closeModal);
-  DOM.taskForm?.addEventListener('submit', handleFormSubmit);
+  // 🎯 Event Delegation — tüm kart etkileşimleri tek listener
+  try {
+    initTaskGridDelegation();
+  } catch (err) {
+    console.error('[App] Event delegation hatası:', err);
+  }
 
   initChips();
   initPriorityButtons();
@@ -1002,17 +1026,22 @@ async function init() {
   initKeyboardShortcuts();
   initSearch();
 
-  // 🔐 Auth Persistence
-  const session = await db.getSession();
-  if (session?.user) {
-    State.user = session.user;
-    updateUserBar(State.user);
-    hideAuth();
-    await loadDashboard();
-    oneSignalLogin(State.user);
-    startRealtime();
-    startReminderEngine();
-  } else {
+  // 🔐 Auth Persistence — try-catch ile korunaklı
+  try {
+    const session = await db.getSession();
+    if (session?.user) {
+      State.user = session.user;
+      updateUserBar(State.user);
+      hideAuth();
+      await loadDashboard();
+      oneSignalLogin(State.user);
+      startRealtime();
+      startReminderEngine();
+    } else {
+      showAuth();
+    }
+  } catch (err) {
+    console.error('[App] Auth başlatma hatası:', err);
     showAuth();
   }
 

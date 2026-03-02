@@ -1372,7 +1372,7 @@ body.body--modal-open {
   }
 
   .fab {
-    bottom: 20px;
+    bottom: 30px;
     right: 20px;
     width: 54px;
     height: 54px;
@@ -1467,7 +1467,7 @@ body.body--modal-open {
 /* ─── PWA güvenli alan desteği ────────────────────────────── */
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
   .fab {
-    bottom: calc(32px + env(safe-area-inset-bottom));
+    bottom: calc(30px + env(safe-area-inset-bottom));
   }
 }
 
